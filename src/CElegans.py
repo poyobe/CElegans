@@ -33,6 +33,7 @@ print val2
 """------------------------------------------------------------------------------------------------------------"""
 # Mesure de la fluoNeuron dans un cercle de rayon circleDiameter/2 centre en (x,y)
 def measurefluoNeuron(x, y, circleDiameter, img):
+    "# Mesure de la fluoNeuron dans un cercle de rayon circleDiameter/2 centre en (x,y)"
     fluoNeuronSum = 0
     for i in range (0, circleDiameter):
         for j in range (0, circleDiameter):
@@ -66,7 +67,6 @@ def properties(fluoNeuron, picsThreshold, fluoMax, fluoMaxIndice):
     if fluoMaxIndice == 0 or fluoMaxIndice == 1: # on tient compte du cas ou le noyau est au bout du neurone
         for i in range(fluoMaxIndice+2, len(fluoNeuron)):
             fluoNeuronSumWOSoma += fluoNeuron[i]
-            
     if fluoMaxIndice == len(fluoNeuron) or fluoMaxIndice == len(fluoNeuron)-1: # on tient compte du cas ou le noyau est au bout du neurone
         for i in range(0, fluoMaxIndice-2):
             fluoNeuronSumWOSoma += fluoNeuron[i]
@@ -77,6 +77,14 @@ def properties(fluoNeuron, picsThreshold, fluoMax, fluoMaxIndice):
         for i in range(fluoMaxIndice+2, len(fluoNeuron)):
             fluoNeuronSumWOSoma += fluoNeuron[i]
                 
+    # mesure de la moyenne dans le Soma en tenant compte de sa position dans le neurone
+    if fluoMaxIndice == 0:
+        meanSoma = (fluoNeuron[0] + fluoNeuron[1])/2
+    if fluoMaxIndice == len(fluoNeuron)-1:
+        meanSoma = (fluoNeuron[fluoMaxIndice-1] + fluoNeuron[fluoMaxIndice])/2
+    else:
+        meanSoma = (fluoNeuron[fluoMaxIndice-1] + fluoNeuron[fluoMaxIndice] + fluoNeuron[fluoMaxIndice+1])/3
+    
     meanWOSoma = fluoNeuronSumWOSoma / len(fluoNeuron)
     
     # compte du nombre de pics au dessus du seuil picsThreshold et du nombre de pics absolus
@@ -104,7 +112,7 @@ def properties(fluoNeuron, picsThreshold, fluoMax, fluoMaxIndice):
     if fluoNeuron[len(fluoNeuron)-3] < fluoNeuron[len(fluoNeuron)-2] < fluoNeuron[len(fluoNeuron)-1]:
         numberOfPics += 1
                            
-    return (mean, picsThreshold, numberOfPicsThreshold, numberOfPics, meanWOSoma)
+    return (mean, picsThreshold, numberOfPicsThreshold, numberOfPics, meanWOSoma, meanSoma)
 """------------------------------------------------------------------------------------------------------------"""  
 
 """------------------------------------------------------------------------------------------------------------"""    
@@ -207,25 +215,29 @@ def imgPreparation(img, Cercles, Filter1, Filter2, distBetweenCircles, circleDia
     return neuron
 
 """------------------------------------------------------------------------------------------------------------""" 
-def lenghtMeasure(neuron):
-    dist2 = []*(len(neuron)-1)
-    for i in range(0, len(neuron)-1):
-        dist2.append(math.sqrt(((neuron[i][0]-neuron[i+1][0])*(neuron[i][0]-neuron[i+1][0]))+((neuron[i][1]-neuron[i+1][1])*(neuron[i][1]-neuron[i+1][1]))))
-
-    distSum = []*(len(dist2))
-    distSum.insert(0,0)
-
-    for i in range(0, len(dist2)):
-        distSum.append(distSum[i] + dist2[i])
+def lenghtMeasure(neuron, start, stop):
+    dist = []*((stop-start))
+    for i in range(start, stop-1):
+        dist.append(math.sqrt(((neuron[i][0]-neuron[i+1][0])*(neuron[i][0]-neuron[i+1][0]))+((neuron[i][1]-neuron[i+1][1])*(neuron[i][1]-neuron[i+1][1]))))
     
-    return (distSum, distSum[len(dist2)])
+    # gestion du cas particulier ou la longueur du dendrite est nulle
+    distSum = []*(len(dist))
+    distSum.append(0)
+    if len(dist)>0:
+        distSum.append(dist[0])
+    if len(dist)>1:
+        for i in range(2, len(dist)):
+            distSum.append(distSum[i-1] + dist[i-1])
+        distSum.append(distSum[-1] + dist[-1])
+    
+    return (distSum, distSum[-1])
     
 """-----------------------------------------------------------------------------------------------------------------"""  
 def roundNumber(a):
     return floor(a+0.5)
 """-----------------------------------------------------------------------------------------------------------------"""  
 
-def saveParameters(feuil1, listImg, i, propsGraph, distSum, fluoMax):
+def saveParameters(feuil1, listImg, i, propsGraph, distSum, fluoMax, distDendSum, distAxonSum):
     feuil1.write(i+5,0, listImg)
     feuil1.write(i+5,1,propsGraph[0])
     feuil1.write(i+5,2,propsGraph[4])
@@ -233,8 +245,10 @@ def saveParameters(feuil1, listImg, i, propsGraph, distSum, fluoMax):
     feuil1.write(i+5,4,fluoMax)
     feuil1.write(i+5,5,propsGraph[2])
     feuil1.write(i+5,6,propsGraph[3])
+    feuil1.write(i+5,7,propsGraph[5])
+    feuil1.write(i+5,8,int(distDendSum))
+    feuil1.write(i+5,9,int(distAxonSum))
     
-    """return (mean, picsThreshold, numberOfPicsThreshold, numberOfPics, meanWOSoma)"""
     
 """-----------------------------------------------------------------------------------------------------------------"""  
 def cElegans(filePath, Cercles, Filter1, Filter2, distBetweenCircles, circleDiameter, thresholdVal, picsThreshold, circleDiameterSoma):
@@ -274,10 +288,15 @@ def cElegans(filePath, Cercles, Filter1, Filter2, distBetweenCircles, circleDiam
     feuil1.write(3,4,'max')
     feuil1.write(3,5,'numberOfPicsOverTreshold')
     feuil1.write(3,6,'numberOfPics')
+    feuil1.write(3,7,'meanSoma')
+    feuil1.write(3,8,'dendrite lenght')
+    feuil1.write(3,9,'axon lenght')
     
-    # ajustement de la taille des colonnes
-    for j in range(0,7):
+    """
+    # ajustement de la taille des colonnes dans le xls
+    for j in range(0,10):
         feuil1.col(j).width = 6000
+    """
     
     """
     # mesure du ratio aire des cercles de l'axone / aire des cercles du soma pour normaliser la mesure de fluo par rapport a la surface des cercles
@@ -286,12 +305,12 @@ def cElegans(filePath, Cercles, Filter1, Filter2, distBetweenCircles, circleDiam
      
     # boucle sur toutes les images pour appliquer le scan   
     for i in range(0,numberOfImg):
-        plt.figure(i)
+        plt.figure(listImg[i])
         imgPath = os.path.join(filePath, listImg[i])
         img = io.imread(imgPath)
         
         neuron = imgPreparation(img, Cercles, Filter1, Filter2, distBetweenCircles, circleDiameter, thresholdVal)
-        distSum = lenghtMeasure(neuron)
+        distSum = lenghtMeasure(neuron, 0, len(neuron))
         fluoNeuron = []*(len(neuron)+1)
         
         fluoMax = 0
@@ -303,6 +322,14 @@ def cElegans(filePath, Cercles, Filter1, Filter2, distBetweenCircles, circleDiam
             if fluoNeuron[j] > fluoMax:
                 fluoMax = fluoNeuron[j]
                 fluoMaxIndice = j
+        
+        
+        # mesure des longueurs de chaque cote du soma pour avoir la longueur du dendrite et de l'axone
+        dist1 = lenghtMeasure(neuron, fluoMaxIndice, len(neuron))
+        dist2 = lenghtMeasure(neuron, 0, fluoMaxIndice)
+        
+        distDendSum = min(int(dist1[1]), int(dist2[1]))
+        distAxonSum = max(int(dist1[1]), int(dist2[1]))
         
         # determination du nombre de points ou aggrandir le cercle si le noyau est proche du bord
         # + re-mesure de la fluo dans un cercle plus grand pour le noyau
@@ -363,7 +390,7 @@ def cElegans(filePath, Cercles, Filter1, Filter2, distBetweenCircles, circleDiam
         # sauvegarde des images et du tableur
         pylab.savefig(listImg[i])
         # creation materielle du fichier resultant
-        saveParameters(feuil1, str(listImg[i]), i, propsGraph, distSum[1], fluoMax)
+        saveParameters(feuil1, str(listImg[i]), i, propsGraph, distSum[1], fluoMax, distDendSum, distAxonSum)
         
     book.save('CElegans.xls')    
 """------------------------------------------------------------------------------------------------------------"""   
