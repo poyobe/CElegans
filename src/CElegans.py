@@ -14,14 +14,6 @@ import math
 import os
 from xlwt import Workbook
 
-"""
-distBetweenCircles = 10
-circleDiameter = 12   #il reste un bug si le cercle doit etre trace en dehors de l'image
-Cercles = True
-Filter1 = False
-Filter2 = True
-thresholdVal = 6000
-"""
 smallAreaSize = 4
 
 # test de seuil par Otsu (trop eleve)
@@ -33,7 +25,7 @@ print val2
 """------------------------------------------------------------------------------------------------------------"""
 # Mesure de la fluoNeuron dans un cercle de rayon circleDiameter/2 centre en (x,y)
 def measurefluoNeuron(x, y, circleDiameter, img):
-    "# Mesure de la fluoNeuron dans un cercle de rayon circleDiameter/2 centre en (x,y)"
+    # Mesure de la fluoNeuron dans un cercle de rayon circleDiameter/2 centre en (x,y)
     fluoNeuronSum = 0
     for i in range (0, circleDiameter):
         for j in range (0, circleDiameter):
